@@ -53,16 +53,16 @@
 					"name": "select2"
 				},
 				{
-					"name": "union1"
-				},
-				{
-					"name": "union2"
-				},
-				{
 					"name": "select3"
 				},
 				{
+					"name": "union1"
+				},
+				{
 					"name": "union3"
+				},
+				{
+					"name": "union2"
 				}
 			],
 			"scriptLines": [
@@ -145,11 +145,21 @@
 				"     ),",
 				"     skipDuplicateMapInputs: true,",
 				"     skipDuplicateMapOutputs: true) ~> select2",
-				"select1, sql union(byName: true)~> union1",
-				"union1, union3 union(byName: true)~> union2",
-				"xls2 select(skipDuplicateMapInputs: true,",
+				"xls2 select(mapColumn(",
+				"          ParadaHistoricaId = nro_parada,",
+				"          NombreParada = nombre_parada,",
+				"          Zona = zona,",
+				"          Latitud = latitud,",
+				"          Longitud = longitud,",
+				"          VigenciaDesde = fecha_desde,",
+				"          VigenciaHasta = fecha_hasta,",
+				"          Estado = estado",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
 				"     skipDuplicateMapOutputs: true) ~> select3",
+				"select1, sql union(byName: true)~> union1",
 				"select2, select3 union(byName: true)~> union3",
+				"union1, union3 union(byName: true)~> union2",
 				"union2 sink(allowSchemaDrift: true,",
 				"     validateSchema: false,",
 				"     input(",
