@@ -1,7 +1,7 @@
 {
 	"name": "pipeline_bronze",
 	"properties": {
-		"description": "Canalización para ejecutar secuencialmente los 7 Data Flows de la capa Bronze.",
+		"description": "Canalización secuencial para los 7 Data Flows de la capa Bronze.",
 		"activities": [
 			{
 				"name": "df_bronze_paradas",
@@ -121,7 +121,7 @@
 				}
 			},
 			{
-				"name": "df_bronze_incidentes",
+				"name": "df_bronze_incidente_rutas",
 				"type": "ExecuteDataFlow",
 				"dependsOn": [
 					{
@@ -141,7 +141,7 @@
 				"userProperties": [],
 				"typeProperties": {
 					"dataflow": {
-						"referenceName": "df_bronze_incidentes",
+						"referenceName": "df_bronze_incidente_rutas",
 						"type": "DataFlowReference"
 					},
 					"compute": {
@@ -156,7 +156,7 @@
 				"type": "ExecuteDataFlow",
 				"dependsOn": [
 					{
-						"activity": "df_bronze_incidentes",
+						"activity": "df_bronze_incidente_rutas",
 						"dependencyConditions": [
 							"Succeeded"
 						]
