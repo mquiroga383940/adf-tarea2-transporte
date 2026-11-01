@@ -1,13 +1,47 @@
 {
 	"name": "pipeline_silver",
 	"properties": {
-		"description": "Ejecución ordenada de los 7 Data Flows de la capa Silver.",
+		"description": "Canalización Silver con vaciado inicial mediante Script SQL para evitar conflictos de Clave Primaria y ejecución ordenada por llaves foráneas.",
 		"activities": [
+			{
+				"name": "Script_LimpiarTablasSilver",
+				"type": "Script",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.00:10:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "sql_dw_transporte",
+					"type": "LinkedServiceReference"
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"type": "NonQuery",
+							"text": "DELETE FROM silver.IncidenteRuta;\nDELETE FROM silver.Incidentes;\nDELETE FROM silver.DemandaParadas;\nDELETE FROM silver.Viajes;\nDELETE FROM silver.Paradas;\nDELETE FROM silver.Rutas;\nDELETE FROM silver.Vehiculos;"
+						}
+					],
+					"scriptBlockExecutionTimeout": "00:05:00"
+				}
+			},
 			{
 				"name": "df_silver_paradas",
 				"type": "ExecuteDataFlow",
-				"dependsOn": [],
+				"dependsOn": [
+					{
+						"activity": "Script_LimpiarTablasSilver",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
 				"policy": {
+					"timeout": "0.01:00:00",
 					"retry": 0,
 					"retryIntervalInSeconds": 30,
 					"secureOutput": false,
@@ -29,8 +63,16 @@
 			{
 				"name": "df_silver_rutas",
 				"type": "ExecuteDataFlow",
-				"dependsOn": [],
+				"dependsOn": [
+					{
+						"activity": "Script_LimpiarTablasSilver",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
 				"policy": {
+					"timeout": "0.01:00:00",
 					"retry": 0,
 					"retryIntervalInSeconds": 30,
 					"secureOutput": false,
@@ -52,8 +94,16 @@
 			{
 				"name": "df_silver_vehiculos",
 				"type": "ExecuteDataFlow",
-				"dependsOn": [],
+				"dependsOn": [
+					{
+						"activity": "Script_LimpiarTablasSilver",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
 				"policy": {
+					"timeout": "0.01:00:00",
 					"retry": 0,
 					"retryIntervalInSeconds": 30,
 					"secureOutput": false,
@@ -84,6 +134,7 @@
 					}
 				],
 				"policy": {
+					"timeout": "0.01:00:00",
 					"retry": 0,
 					"retryIntervalInSeconds": 30,
 					"secureOutput": false,
@@ -120,6 +171,7 @@
 					}
 				],
 				"policy": {
+					"timeout": "0.01:00:00",
 					"retry": 0,
 					"retryIntervalInSeconds": 30,
 					"secureOutput": false,
@@ -156,6 +208,7 @@
 					}
 				],
 				"policy": {
+					"timeout": "0.01:00:00",
 					"retry": 0,
 					"retryIntervalInSeconds": 30,
 					"secureOutput": false,
@@ -192,6 +245,7 @@
 					}
 				],
 				"policy": {
+					"timeout": "0.01:00:00",
 					"retry": 0,
 					"retryIntervalInSeconds": 30,
 					"secureOutput": false,
