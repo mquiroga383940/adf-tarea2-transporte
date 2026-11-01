@@ -6,11 +6,145 @@
 		},
 		"type": "MappingDataFlow",
 		"typeProperties": {
-			"sources": [],
-			"sinks": [],
-			"transformations": [],
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "dw_bronze_incidentes_sql",
+						"type": "DatasetReference"
+					},
+					"name": "source1"
+				},
+				{
+					"dataset": {
+						"referenceName": "dw_silver_vehiculos_sql",
+						"type": "DatasetReference"
+					},
+					"name": "pvehiculos"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "dw_silver_incidentes_sql",
+						"type": "DatasetReference"
+					},
+					"name": "sink1"
+				}
+			],
+			"transformations": [
+				{
+					"name": "svehiculos"
+				},
+				{
+					"name": "derive1"
+				},
+				{
+					"name": "derive2"
+				},
+				{
+					"name": "derive3"
+				},
+				{
+					"name": "filter1"
+				},
+				{
+					"name": "window1"
+				},
+				{
+					"name": "filter2"
+				},
+				{
+					"name": "lookup1"
+				},
+				{
+					"name": "derivefk1"
+				}
+			],
 			"scriptLines": [
-				""
+				"source(output(",
+				"          AnioFuente as string,",
+				"          IncidenteId as string,",
+				"          TipoIncidente as string,",
+				"          Severidad as string,",
+				"          FechaHoraInicio as string,",
+				"          FechaHoraFin as string,",
+				"          FechaHoraRegistro as string,",
+				"          VehiculoId as string,",
+				"          Descripcion as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> source1",
+				"source(output(",
+				"          AnioFuente as short,",
+				"          VehiculoId as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> pvehiculos",
+				"pvehiculos select(mapColumn(",
+				"          vehiculosAnio = AnioFuente,",
+				"          vehiculosId = VehiculoId",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> svehiculos",
+				"source1 derive(each(match(type=='string'), $$ = iif(isNull($$) || trim($$)=='' || in(['NULL','NAN','N/A','NA','S/D','#N/A'], upper(trim($$))), toString(null()), regexReplace(trim($$),'[ ]+',' ')))) ~> derive1",
+				"derive1 derive(IncidenteId = upper(IncidenteId),",
+				"          TipoIncidente = upper(TipoIncidente),",
+				"          Severidad = upper(Severidad),",
+				"          FechaHoraInicio = iif(regexMatch(replace(replace(FechaHoraInicio,'T',' '),'-','/'),'^[0-9]{4}/.*'), coalesce(toTimestamp(replace(replace(FechaHoraInicio,'T',' '),'-','/'),'yyyy/M/d H:mm:ss'), toTimestamp(replace(replace(FechaHoraInicio,'T',' '),'-','/'),'yyyy/M/d H:mm'), toTimestamp(replace(replace(FechaHoraInicio,'T',' '),'-','/'),'yyyy/M/d')), coalesce(toTimestamp(replace(replace(FechaHoraInicio,'T',' '),'-','/'),'d/M/yyyy H:mm:ss'), toTimestamp(replace(replace(FechaHoraInicio,'T',' '),'-','/'),'d/M/yyyy H:mm'), toTimestamp(replace(replace(FechaHoraInicio,'T',' '),'-','/'),'d/M/yyyy'))),",
+				"          FechaHoraFin = iif(regexMatch(replace(replace(FechaHoraFin,'T',' '),'-','/'),'^[0-9]{4}/.*'), coalesce(toTimestamp(replace(replace(FechaHoraFin,'T',' '),'-','/'),'yyyy/M/d H:mm:ss'), toTimestamp(replace(replace(FechaHoraFin,'T',' '),'-','/'),'yyyy/M/d H:mm'), toTimestamp(replace(replace(FechaHoraFin,'T',' '),'-','/'),'yyyy/M/d')), coalesce(toTimestamp(replace(replace(FechaHoraFin,'T',' '),'-','/'),'d/M/yyyy H:mm:ss'), toTimestamp(replace(replace(FechaHoraFin,'T',' '),'-','/'),'d/M/yyyy H:mm'), toTimestamp(replace(replace(FechaHoraFin,'T',' '),'-','/'),'d/M/yyyy'))),",
+				"          FechaHoraRegistro = iif(regexMatch(replace(replace(FechaHoraRegistro,'T',' '),'-','/'),'^[0-9]{4}/.*'), coalesce(toTimestamp(replace(replace(FechaHoraRegistro,'T',' '),'-','/'),'yyyy/M/d H:mm:ss'), toTimestamp(replace(replace(FechaHoraRegistro,'T',' '),'-','/'),'yyyy/M/d H:mm'), toTimestamp(replace(replace(FechaHoraRegistro,'T',' '),'-','/'),'yyyy/M/d')), coalesce(toTimestamp(replace(replace(FechaHoraRegistro,'T',' '),'-','/'),'d/M/yyyy H:mm:ss'), toTimestamp(replace(replace(FechaHoraRegistro,'T',' '),'-','/'),'d/M/yyyy H:mm'), toTimestamp(replace(replace(FechaHoraRegistro,'T',' '),'-','/'),'d/M/yyyy'))),",
+				"          VehiculoId = iif(length(upper(VehiculoId)) <= 20, upper(VehiculoId), toString(null())),",
+				"          Descripcion = left(coalesce(Descripcion,'SIN DESCRIPCION'),200)) ~> derive2",
+				"derive2 derive(AnioFuente = toShort(AnioFuente),",
+				"          FechaHoraFin = iif(FechaHoraFin >= FechaHoraInicio, FechaHoraFin, toTimestamp(null()))) ~> derive3",
+				"derive3 filter(!isNull(AnioFuente) && !isNull(IncidenteId) && length(IncidenteId) <= 30 && !isNull(TipoIncidente) && length(TipoIncidente) <= 30 && !isNull(Severidad) && length(Severidad) <= 15 && !isNull(FechaHoraInicio) && !isNull(FechaHoraFin) && !isNull(FechaHoraRegistro) && !isNull(Descripcion) && length(Descripcion) <= 200) ~> filter1",
+				"filter1 window(over(AnioFuente,",
+				"          IncidenteId),",
+				"     desc(FechaHoraRegistro, true),",
+				"     rn = rowNumber()) ~> window1",
+				"window1 filter(rn == 1) ~> filter2",
+				"filter2, svehiculos lookup(AnioFuente == vehiculosAnio",
+				"     && VehiculoId == vehiculosId,",
+				"     multiple: false,",
+				"     pickup: 'any',",
+				"     broadcast: 'auto')~> lookup1",
+				"lookup1 derive(VehiculoId = iif(isNull(vehiculosId), toString(null()), VehiculoId)) ~> derivefk1",
+				"derivefk1 sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          AnioFuente as integer,",
+				"          IncidenteId as string,",
+				"          TipoIncidente as string,",
+				"          Severidad as string,",
+				"          FechaHoraInicio as timestamp,",
+				"          FechaHoraFin as timestamp,",
+				"          FechaHoraRegistro as timestamp,",
+				"          VehiculoId as string,",
+				"          Descripcion as string",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          AnioFuente,",
+				"          IncidenteId,",
+				"          TipoIncidente,",
+				"          Severidad,",
+				"          FechaHoraInicio,",
+				"          FechaHoraFin,",
+				"          FechaHoraRegistro,",
+				"          VehiculoId,",
+				"          Descripcion",
+				"     )) ~> sink1"
 			]
 		}
 	}

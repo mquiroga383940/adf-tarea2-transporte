@@ -6,11 +6,106 @@
 		},
 		"type": "MappingDataFlow",
 		"typeProperties": {
-			"sources": [],
-			"sinks": [],
-			"transformations": [],
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "dw_bronze_vehiculos_sql",
+						"type": "DatasetReference"
+					},
+					"name": "source1"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "dw_silver_vehiculos_sql",
+						"type": "DatasetReference"
+					},
+					"name": "sink1"
+				}
+			],
+			"transformations": [
+				{
+					"name": "derive1"
+				},
+				{
+					"name": "derive2"
+				},
+				{
+					"name": "derive3"
+				},
+				{
+					"name": "filter1"
+				},
+				{
+					"name": "window1"
+				},
+				{
+					"name": "filter2"
+				}
+			],
 			"scriptLines": [
-				""
+				"source(output(",
+				"          AnioFuente as string,",
+				"          VehiculoId as string,",
+				"          Placa as string,",
+				"          TipoVehiculo as string,",
+				"          CapacidadEfectiva as string,",
+				"          VigenciaDesde as string,",
+				"          VigenciaHasta as string,",
+				"          Estado as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> source1",
+				"source1 derive(each(match(type=='string'), $$ = iif(isNull($$) || trim($$)=='' || in(['NULL','NAN','N/A','NA','S/D','#N/A'], upper(trim($$))), toString(null()), regexReplace(trim($$),'[ ]+',' ')))) ~> derive1",
+				"derive1 derive(VehiculoId = upper(VehiculoId),",
+				"          Placa = upper(replace(Placa,' ','')),",
+				"          TipoVehiculo = left(initCap(lower(TipoVehiculo)),30),",
+				"          CapacidadStr = regexReplace(replace(CapacidadEfectiva,',','.'),'[^0-9.]',''),",
+				"          VigenciaDesde = iif(regexMatch(replace(regexReplace(VigenciaDesde,'[ T].*$',''),'-','/'),'^[0-9]{4}/.*'), toDate(replace(regexReplace(VigenciaDesde,'[ T].*$',''),'-','/'),'yyyy/M/d'), iif(regexMatch(replace(regexReplace(VigenciaDesde,'[ T].*$',''),'-','/'),'^[0-9]{5}$'), addDays(toDate('1899-12-30','yyyy-MM-dd'), toInteger(replace(regexReplace(VigenciaDesde,'[ T].*$',''),'-','/'))), toDate(replace(regexReplace(VigenciaDesde,'[ T].*$',''),'-','/'),'d/M/yyyy'))),",
+				"          VigenciaHasta = iif(regexMatch(replace(regexReplace(VigenciaHasta,'[ T].*$',''),'-','/'),'^[0-9]{4}/.*'), toDate(replace(regexReplace(VigenciaHasta,'[ T].*$',''),'-','/'),'yyyy/M/d'), iif(regexMatch(replace(regexReplace(VigenciaHasta,'[ T].*$',''),'-','/'),'^[0-9]{5}$'), addDays(toDate('1899-12-30','yyyy-MM-dd'), toInteger(replace(regexReplace(VigenciaHasta,'[ T].*$',''),'-','/'))), toDate(replace(regexReplace(VigenciaHasta,'[ T].*$',''),'-','/'),'d/M/yyyy'))),",
+				"          Estado = upper(Estado)) ~> derive2",
+				"derive2 derive(AnioFuente = toShort(AnioFuente),",
+				"          CapacidadEfectiva = iif(!isNull(CapacidadStr) && toDouble(CapacidadStr) > 0 && toDouble(CapacidadStr) <= 200, toInteger(round(toDouble(CapacidadStr))), toInteger(null())),",
+				"          VigenciaHasta = coalesce(VigenciaHasta, toDate('9999-12-31','yyyy-MM-dd'))) ~> derive3",
+				"derive3 filter(!isNull(AnioFuente) && !isNull(VehiculoId) && length(VehiculoId) <= 20 && !isNull(Placa) && length(Placa) <= 20 && !isNull(TipoVehiculo) && length(TipoVehiculo) <= 30 && !isNull(CapacidadEfectiva) && !isNull(VigenciaDesde) && !isNull(VigenciaHasta) && !isNull(Estado) && length(Estado) <= 20 && VigenciaHasta >= VigenciaDesde) ~> filter1",
+				"filter1 window(over(AnioFuente,",
+				"          VehiculoId),",
+				"     desc(VigenciaDesde, true),",
+				"     rn = rowNumber()) ~> window1",
+				"window1 filter(rn == 1) ~> filter2",
+				"filter2 sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          AnioFuente as integer,",
+				"          VehiculoId as string,",
+				"          Placa as string,",
+				"          TipoVehiculo as string,",
+				"          CapacidadEfectiva as integer,",
+				"          VigenciaDesde as date,",
+				"          VigenciaHasta as date,",
+				"          Estado as string",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          AnioFuente,",
+				"          VehiculoId,",
+				"          Placa,",
+				"          TipoVehiculo,",
+				"          CapacidadEfectiva,",
+				"          VigenciaDesde,",
+				"          VigenciaHasta,",
+				"          Estado",
+				"     )) ~> sink1"
 			]
 		}
 	}

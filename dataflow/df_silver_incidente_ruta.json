@@ -6,11 +6,164 @@
 		},
 		"type": "MappingDataFlow",
 		"typeProperties": {
-			"sources": [],
-			"sinks": [],
-			"transformations": [],
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "dw_bronze_incidentes_ruta_sql",
+						"type": "DatasetReference"
+					},
+					"name": "source1"
+				},
+				{
+					"dataset": {
+						"referenceName": "dw_silver_incidentes_sql",
+						"type": "DatasetReference"
+					},
+					"name": "pincidentes"
+				},
+				{
+					"dataset": {
+						"referenceName": "dw_silver_rutas_sql",
+						"type": "DatasetReference"
+					},
+					"name": "prutas"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "dw_silver_incidente_ruta_Sql",
+						"type": "DatasetReference"
+					},
+					"name": "sink1"
+				}
+			],
+			"transformations": [
+				{
+					"name": "sindicentes"
+				},
+				{
+					"name": "srutas"
+				},
+				{
+					"name": "derive1"
+				},
+				{
+					"name": "derive2"
+				},
+				{
+					"name": "flatten1"
+				},
+				{
+					"name": "derive3"
+				},
+				{
+					"name": "filter1"
+				},
+				{
+					"name": "window1"
+				},
+				{
+					"name": "filter2"
+				},
+				{
+					"name": "exists1"
+				},
+				{
+					"name": "exists2"
+				}
+			],
 			"scriptLines": [
-				""
+				"source(output(",
+				"          AnioFuente as string,",
+				"          IncidenteId as string,",
+				"          RutaHistoricaId as string,",
+				"          EsPrincipal as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> source1",
+				"source(output(",
+				"          AnioFuente as short,",
+				"          IncidenteId as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> pincidentes",
+				"source(output(",
+				"          AnioFuente as short,",
+				"          RutaHistoricaId as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> prutas",
+				"pincidentes select(mapColumn(",
+				"          incidentesAnio = AnioFuente,",
+				"          incidentesId = IncidenteId",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> sindicentes",
+				"prutas select(mapColumn(",
+				"          rutasAnio = AnioFuente,",
+				"          rutasId = RutaHistoricaId",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> srutas",
+				"source1 derive(each(match(type=='string'), $$ = iif(isNull($$) || trim($$)=='' || in(['NULL','NAN','N/A','NA','S/D','#N/A'], upper(trim($$))), toString(null()), regexReplace(trim($$),'[ ]+',' ')))) ~> derive1",
+				"derive1 derive(RutasArray = map(regexSplit(RutaHistoricaId, '[;,|]'), trim(#item)),",
+				"          RutaPrincipal = trim(map(regexSplit(RutaHistoricaId, '[;,|]'), trim(#item))[1])) ~> derive2",
+				"derive2 foldDown(unroll(RutasArray),",
+				"     mapColumn(",
+				"          AnioFuente,",
+				"          IncidenteId,",
+				"          RutaHistoricaId = RutasArray,",
+				"          EsPrincipal,",
+				"          RutaPrincipal",
+				"     ),",
+				"     skipDuplicateMapInputs: false,",
+				"     skipDuplicateMapOutputs: false) ~> flatten1",
+				"flatten1 derive(AnioFuente = toShort(AnioFuente),",
+				"          IncidenteId = upper(IncidenteId),",
+				"          RutaHistoricaId = upper(RutaHistoricaId),",
+				"          EsPrincipal = iif(in(['1','TRUE','SI','SÍ','S','Y','YES','VERDADERO'], upper(EsPrincipal)), true(), iif(in(['0','FALSE','NO','N','FALSO'], upper(EsPrincipal)), false(), upper(RutaHistoricaId) == upper(RutaPrincipal)))) ~> derive3",
+				"derive3 filter(!isNull(AnioFuente) && !isNull(IncidenteId) && length(IncidenteId) <= 30 && !isNull(RutaHistoricaId) && length(RutaHistoricaId) <= 30 && !isNull(EsPrincipal)) ~> filter1",
+				"filter1 window(over(AnioFuente,",
+				"          IncidenteId,",
+				"          RutaHistoricaId),",
+				"     desc(EsPrincipal, true),",
+				"     rn = rowNumber()) ~> window1",
+				"window1 filter(rn == 1) ~> filter2",
+				"filter2, sindicentes exists(AnioFuente == incidentesAnio && IncidenteId == incidentesId,",
+				"     negate:false,",
+				"     broadcast: 'auto')~> exists1",
+				"exists1, srutas exists(AnioFuente == rutasAnio && RutaHistoricaId == rutasId,",
+				"     negate:false,",
+				"     broadcast: 'auto')~> exists2",
+				"exists2 sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          AnioFuente as integer,",
+				"          IncidenteId as string,",
+				"          RutaHistoricaId as string,",
+				"          EsPrincipal as boolean",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          AnioFuente,",
+				"          IncidenteId,",
+				"          RutaHistoricaId,",
+				"          EsPrincipal",
+				"     )) ~> sink1"
 			]
 		}
 	}

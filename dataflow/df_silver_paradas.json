@@ -15,8 +15,35 @@
 					"name": "source1"
 				}
 			],
-			"sinks": [],
-			"transformations": [],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "dw_silver_paradas_sql",
+						"type": "DatasetReference"
+					},
+					"name": "sink1"
+				}
+			],
+			"transformations": [
+				{
+					"name": "derive1"
+				},
+				{
+					"name": "derive2"
+				},
+				{
+					"name": "derive3"
+				},
+				{
+					"name": "filter1"
+				},
+				{
+					"name": "window1"
+				},
+				{
+					"name": "filter2"
+				}
+			],
 			"scriptLines": [
 				"source(output(",
 				"          AnioFuente as string,",
@@ -33,7 +60,62 @@
 				"     allowSchemaDrift: true,",
 				"     validateSchema: false,",
 				"     isolationLevel: 'READ_UNCOMMITTED',",
-				"     format: 'table') ~> source1"
+				"     format: 'table') ~> source1",
+				"source1 derive(each(match(type=='string'), $$ = iif(isNull($$) || trim($$)=='' || in(['NULL','NAN','N/A','NA','S/D','#N/A'], upper(trim($$))), toString(null()), regexReplace(trim($$),'[ ]+',' ')))) ~> derive1",
+				"derive1 derive(ParadaHistoricaId = upper(ParadaHistoricaId),",
+				"          CodigoPublicado = upper(CodigoPublicado),",
+				"          NombreParada = left(NombreParada,120),",
+				"          Zona = left(initCap(lower(Zona)),40),",
+				"          Latitud = regexReplace(replace(Latitud,',','.'),'[^0-9.-]',''),",
+				"          Longitud = regexReplace(replace(Longitud,',','.'),'[^0-9.-]',''),",
+				"          VigenciaDesde = iif(regexMatch(replace(regexReplace(VigenciaDesde,'[ T].*$',''),'-','/'),'^[0-9]{4}/.*'), toDate(replace(regexReplace(VigenciaDesde,'[ T].*$',''),'-','/'),'yyyy/M/d'), iif(regexMatch(replace(regexReplace(VigenciaDesde,'[ T].*$',''),'-','/'),'^[0-9]{5}$'), addDays(toDate('1899-12-30','yyyy-MM-dd'), toInteger(replace(regexReplace(VigenciaDesde,'[ T].*$',''),'-','/'))), toDate(replace(regexReplace(VigenciaDesde,'[ T].*$',''),'-','/'),'d/M/yyyy'))),",
+				"          VigenciaHasta = iif(regexMatch(replace(regexReplace(VigenciaHasta,'[ T].*$',''),'-','/'),'^[0-9]{4}/.*'), toDate(replace(regexReplace(VigenciaHasta,'[ T].*$',''),'-','/'),'yyyy/M/d'), iif(regexMatch(replace(regexReplace(VigenciaHasta,'[ T].*$',''),'-','/'),'^[0-9]{5}$'), addDays(toDate('1899-12-30','yyyy-MM-dd'), toInteger(replace(regexReplace(VigenciaHasta,'[ T].*$',''),'-','/'))), toDate(replace(regexReplace(VigenciaHasta,'[ T].*$',''),'-','/'),'d/M/yyyy'))),",
+				"          Estado = upper(Estado)) ~> derive2",
+				"derive2 derive(AnioFuente = toShort(AnioFuente),",
+				"          CodigoPublicado = coalesce(CodigoPublicado, ParadaHistoricaId),",
+				"          Latitud = iif(!isNull(Latitud) && toDouble(Latitud) >= -90.0 && toDouble(Latitud) <= 90.0, toDecimal(Latitud, 9, 6), toDecimal(null(), 9, 6)),",
+				"          Longitud = iif(!isNull(Longitud) && toDouble(Longitud) >= -180.0 && toDouble(Longitud) <= 180.0, toDecimal(Longitud, 9, 6), toDecimal(null(), 9, 6)),",
+				"          VigenciaHasta = coalesce(VigenciaHasta, toDate('9999-12-31','yyyy-MM-dd'))) ~> derive3",
+				"derive3 filter(!isNull(AnioFuente) && !isNull(ParadaHistoricaId) && length(ParadaHistoricaId) <= 30 && !isNull(CodigoPublicado) && length(CodigoPublicado) <= 20 && !isNull(NombreParada) && length(NombreParada) <= 120 && !isNull(Zona) && length(Zona) <= 40 && !isNull(Latitud) && !isNull(Longitud) && !isNull(VigenciaDesde) && !isNull(VigenciaHasta) && !isNull(Estado) && length(Estado) <= 20 && VigenciaHasta >= VigenciaDesde) ~> filter1",
+				"filter1 window(over(AnioFuente,",
+				"          ParadaHistoricaId),",
+				"     desc(VigenciaDesde, true),",
+				"     rn = rowNumber()) ~> window1",
+				"window1 filter(rn == 1) ~> filter2",
+				"filter2 sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          AnioFuente as string,",
+				"          ParadaHistoricaId as string,",
+				"          CodigoPublicado as string,",
+				"          NombreParada as string,",
+				"          Zona as string,",
+				"          Latitud as string,",
+				"          Longitud as string,",
+				"          VigenciaDesde as string,",
+				"          VigenciaHasta as string,",
+				"          Estado as string",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          AnioFuente,",
+				"          ParadaHistoricaId,",
+				"          CodigoPublicado,",
+				"          NombreParada,",
+				"          Zona,",
+				"          Latitud,",
+				"          Longitud,",
+				"          VigenciaDesde,",
+				"          VigenciaHasta,",
+				"          Estado",
+				"     )) ~> sink1"
 			]
 		}
 	}
