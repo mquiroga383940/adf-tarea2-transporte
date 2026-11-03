@@ -23,7 +23,7 @@
 					"scripts": [
 						{
 							"type": "NonQuery",
-							"text": "DELETE FROM silver.IncidenteRutaAzure;\nDELETE FROM silver.IncidentesAzure;\nDELETE FROM silver.DemandaParadasAzure;\nDELETE FROM silver.ViajesAzure;\nDELETE FROM silver.ParadasAzure;\nDELETE FROM silver.RutasAzure;\nDELETE FROM silver.VehiculosAzure;"
+							"text": "DELETE FROM silver.IncidenteRuta;\nDELETE FROM silver.Incidentes;\nDELETE FROM silver.DemandaParadas;\nDELETE FROM silver.Viajes;\nDELETE FROM silver.Paradas;\nDELETE FROM silver.Rutas;\nDELETE FROM silver.Vehiculos;"
 						}
 					],
 					"scriptBlockExecutionTimeout": "00:05:00"
