@@ -30,55 +30,31 @@
 				},
 				{
 					"name": "derive2"
-				},
-				{
-					"name": "derive3"
-				},
-				{
-					"name": "filter1"
-				},
-				{
-					"name": "window1"
-				},
-				{
-					"name": "filter2"
 				}
 			],
 			"scriptLines": [
 				"source(output(",
 				"          AnioFuente as string,",
 				"          RutaHistoricaId as string,",
-				"          CodigoRuta as string,",
 				"          NombreRuta as string,",
 				"          Origen as string,",
 				"          Destino as string,",
-				"          VigenciaDesde as string,",
-				"          VigenciaHasta as string,",
-				"          Estado as string",
+				"          DistanciaKm as string,",
+				"          TipoServicio as string",
 				"     ),",
 				"     allowSchemaDrift: true,",
 				"     validateSchema: false,",
 				"     isolationLevel: 'READ_UNCOMMITTED',",
 				"     format: 'table') ~> source1",
 				"source1 derive(each(match(type=='string'), $$ = iif(isNull($$) || trim($$)=='' || in(['NULL','NAN','N/A','NA','S/D','#N/A'], upper(trim($$))), toString(null()), regexReplace(trim($$),'[ ]+',' ')))) ~> derive1",
-				"derive1 derive(RutaHistoricaId = upper(RutaHistoricaId),",
-				"          CodigoRuta = upper(CodigoRuta),",
-				"          NombreRuta = left(NombreRuta,120),",
-				"          Origen = left(initCap(lower(Origen)),80),",
-				"          Destino = left(initCap(lower(Destino)),80),",
-				"          VigenciaDesde = iif(regexMatch(replace(regexReplace(VigenciaDesde,'[ T].*$',''),'-','/'),'^[0-9]{4}/.*'), toDate(replace(regexReplace(VigenciaDesde,'[ T].*$',''),'-','/'),'yyyy/M/d'), iif(regexMatch(replace(regexReplace(VigenciaDesde,'[ T].*$',''),'-','/'),'^[0-9]{5}$'), addDays(toDate('1899-12-30','yyyy-MM-dd'), toInteger(replace(regexReplace(VigenciaDesde,'[ T].*$',''),'-','/'))), toDate(replace(regexReplace(VigenciaDesde,'[ T].*$',''),'-','/'),'d/M/yyyy'))),",
-				"          VigenciaHasta = iif(regexMatch(replace(regexReplace(VigenciaHasta,'[ T].*$',''),'-','/'),'^[0-9]{4}/.*'), toDate(replace(regexReplace(VigenciaHasta,'[ T].*$',''),'-','/'),'yyyy/M/d'), iif(regexMatch(replace(regexReplace(VigenciaHasta,'[ T].*$',''),'-','/'),'^[0-9]{5}$'), addDays(toDate('1899-12-30','yyyy-MM-dd'), toInteger(replace(regexReplace(VigenciaHasta,'[ T].*$',''),'-','/'))), toDate(replace(regexReplace(VigenciaHasta,'[ T].*$',''),'-','/'),'d/M/yyyy'))),",
-				"          Estado = upper(Estado)) ~> derive2",
-				"derive2 derive(AnioFuente = toShort(AnioFuente),",
-				"          CodigoRuta = coalesce(CodigoRuta, RutaHistoricaId),",
-				"          VigenciaHasta = coalesce(VigenciaHasta, toDate('9999-12-31','yyyy-MM-dd'))) ~> derive3",
-				"derive3 filter(!isNull(AnioFuente) && !isNull(RutaHistoricaId) && length(RutaHistoricaId) <= 30 && !isNull(CodigoRuta) && length(CodigoRuta) <= 20 && !isNull(NombreRuta) && length(NombreRuta) <= 120 && !isNull(Origen) && length(Origen) <= 80 && !isNull(Destino) && length(Destino) <= 80 && !isNull(VigenciaDesde) && !isNull(VigenciaHasta) && !isNull(Estado) && length(Estado) <= 20 && VigenciaHasta >= VigenciaDesde) ~> filter1",
-				"filter1 window(over(AnioFuente,",
-				"          RutaHistoricaId),",
-				"     desc(VigenciaDesde, true),",
-				"     rn = rowNumber()) ~> window1",
-				"window1 filter(rn == 1) ~> filter2",
-				"filter2 sink(allowSchemaDrift: true,",
+				"derive1 derive(AnioFuente = toShort(AnioFuente),",
+				"          RutaHistoricaId = upper(RutaHistoricaId),",
+				"          NombreRuta = left(initCap(lower(NombreRuta)),100),",
+				"          Origen = left(initCap(lower(Origen)),100),",
+				"          Destino = left(initCap(lower(Destino)),100),",
+				"          DistanciaKm = toDecimal(round(toDouble(regexReplace(replace(DistanciaKm,',','.'),'[^0-9.-]','')),2),8,2),",
+				"          TipoServicio = upper(TipoServicio)) ~> derive2",
+				"derive2 sink(allowSchemaDrift: true,",
 				"     validateSchema: false,",
 				"     input(",
 				"          AnioFuente as integer,",
@@ -102,13 +78,11 @@
 				"     mapColumn(",
 				"          AnioFuente,",
 				"          RutaHistoricaId,",
-				"          CodigoRuta,",
 				"          NombreRuta,",
 				"          Origen,",
 				"          Destino,",
-				"          VigenciaDesde,",
-				"          VigenciaHasta,",
-				"          Estado",
+				"          DistanciaKm,",
+				"          TipoServicio",
 				"     )) ~> sink1"
 			]
 		}

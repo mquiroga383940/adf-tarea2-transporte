@@ -13,20 +13,6 @@
 						"type": "DatasetReference"
 					},
 					"name": "source1"
-				},
-				{
-					"dataset": {
-						"referenceName": "dw_silver_rutas_sql",
-						"type": "DatasetReference"
-					},
-					"name": "prutas"
-				},
-				{
-					"dataset": {
-						"referenceName": "dw_silver_paradas_sql",
-						"type": "DatasetReference"
-					},
-					"name": "pparadas"
 				}
 			],
 			"sinks": [
@@ -40,12 +26,6 @@
 			],
 			"transformations": [
 				{
-					"name": "srutas"
-				},
-				{
-					"name": "sparadas"
-				},
-				{
 					"name": "derive1"
 				},
 				{
@@ -53,21 +33,6 @@
 				},
 				{
 					"name": "derive3"
-				},
-				{
-					"name": "filter1"
-				},
-				{
-					"name": "window1"
-				},
-				{
-					"name": "filter2"
-				},
-				{
-					"name": "exists1"
-				},
-				{
-					"name": "exists2"
 				}
 			],
 			"scriptLines": [
@@ -87,34 +52,6 @@
 				"     validateSchema: false,",
 				"     isolationLevel: 'READ_UNCOMMITTED',",
 				"     format: 'table') ~> source1",
-				"source(output(",
-				"          AnioFuente as short,",
-				"          RutaHistoricaId as string",
-				"     ),",
-				"     allowSchemaDrift: true,",
-				"     validateSchema: false,",
-				"     isolationLevel: 'READ_UNCOMMITTED',",
-				"     format: 'table') ~> prutas",
-				"source(output(",
-				"          AnioFuente as short,",
-				"          ParadaHistoricaId as string",
-				"     ),",
-				"     allowSchemaDrift: true,",
-				"     validateSchema: false,",
-				"     isolationLevel: 'READ_UNCOMMITTED',",
-				"     format: 'table') ~> pparadas",
-				"prutas select(mapColumn(",
-				"          rutasAnio = AnioFuente,",
-				"          rutasId = RutaHistoricaId",
-				"     ),",
-				"     skipDuplicateMapInputs: true,",
-				"     skipDuplicateMapOutputs: true) ~> srutas",
-				"pparadas select(mapColumn(",
-				"          paradasAnio = AnioFuente,",
-				"          paradasId = ParadaHistoricaId",
-				"     ),",
-				"     skipDuplicateMapInputs: true,",
-				"     skipDuplicateMapOutputs: true) ~> sparadas",
 				"source1 derive(each(match(type=='string'), $$ = iif(isNull($$) || trim($$)=='' || in(['NULL','NAN','N/A','NA','S/D','#N/A'], upper(trim($$))), toString(null()), regexReplace(trim($$),'[ ]+',' ')))) ~> derive1",
 				"derive1 derive(DemandaId = upper(DemandaId),",
 				"          FechaServicio = iif(regexMatch(replace(regexReplace(FechaServicio,'[ T].*$',''),'-','/'),'^[0-9]{4}/.*'), toDate(replace(regexReplace(FechaServicio,'[ T].*$',''),'-','/'),'yyyy/M/d'), iif(regexMatch(replace(regexReplace(FechaServicio,'[ T].*$',''),'-','/'),'^[0-9]{5}$'), addDays(toDate('1899-12-30','yyyy-MM-dd'), toInteger(replace(regexReplace(FechaServicio,'[ T].*$',''),'-','/'))), toDate(replace(regexReplace(FechaServicio,'[ T].*$',''),'-','/'),'d/M/yyyy'))),",
@@ -125,23 +62,11 @@
 				"          DemNoAtStr = regexReplace(replace(DemandaNoAtendida,',','.'),'[^0-9.-]',''),",
 				"          Metodo = upper(Metodo)) ~> derive2",
 				"derive2 derive(AnioFuente = toShort(AnioFuente),",
-				"          DemandaId = coalesce(DemandaId, iif(length(concat(toString(FechaServicio,'yyyyMMdd'),'-',RutaHistoricaId,'-',ParadaHistoricaId,'-',coalesce(Franja,'NA'))) <= 30, concat(toString(FechaServicio,'yyyyMMdd'),'-',RutaHistoricaId,'-',ParadaHistoricaId,'-',coalesce(Franja,'NA')), left(md5(concat(toString(FechaServicio,'yyyyMMdd'),'-',RutaHistoricaId,'-',ParadaHistoricaId,'-',coalesce(Franja,'NA'))),30))),",
+				"          DemandaId = coalesce(DemandaId, concat(toString(FechaServicio,'yyyyMMdd'),'-',RutaHistoricaId,'-',ParadaHistoricaId,'-',coalesce(Franja,'NA'))),",
 				"          ValidacionesTarjeta = iif(!isNull(ValStr) && toDouble(ValStr) >= 0, toInteger(round(toDouble(ValStr))), toInteger(null())),",
 				"          Descensos = iif(!isNull(DesStr) && toDouble(DesStr) >= 0, toInteger(round(toDouble(DesStr))), toInteger(null())),",
 				"          DemandaNoAtendida = iif(!isNull(DemNoAtStr) && toDouble(DemNoAtStr) >= 0, toInteger(round(toDouble(DemNoAtStr))), toInteger(null()))) ~> derive3",
-				"derive3 filter(!isNull(AnioFuente) && !isNull(DemandaId) && length(DemandaId) <= 30 && !isNull(FechaServicio) && !isNull(RutaHistoricaId) && length(RutaHistoricaId) <= 30 && !isNull(ParadaHistoricaId) && length(ParadaHistoricaId) <= 30 && !isNull(Franja) && length(Franja) <= 20 && !isNull(ValidacionesTarjeta) && !isNull(Descensos) && !isNull(DemandaNoAtendida) && !isNull(Metodo) && length(Metodo) <= 30) ~> filter1",
-				"filter1 window(over(AnioFuente,",
-				"          DemandaId),",
-				"     asc(FechaServicio, true),",
-				"     rn = rowNumber()) ~> window1",
-				"window1 filter(rn == 1) ~> filter2",
-				"filter2, srutas exists(AnioFuente == rutasAnio && RutaHistoricaId == rutasId,",
-				"     negate:false,",
-				"     broadcast: 'auto')~> exists1",
-				"exists1, sparadas exists(AnioFuente == paradasAnio && ParadaHistoricaId == paradasId,",
-				"     negate:false,",
-				"     broadcast: 'auto')~> exists2",
-				"exists2 sink(allowSchemaDrift: true,",
+				"derive3 sink(allowSchemaDrift: true,",
 				"     validateSchema: false,",
 				"     input(",
 				"          AnioFuente as integer,",
@@ -159,7 +84,6 @@
 				"     insertable:true,",
 				"     updateable:false,",
 				"     upsertable:false,",
-				"     truncate:true,",
 				"     format: 'table',",
 				"     skipDuplicateMapInputs: true,",
 				"     skipDuplicateMapOutputs: true,",

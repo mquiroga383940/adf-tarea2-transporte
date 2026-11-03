@@ -33,15 +33,6 @@
 				},
 				{
 					"name": "derive3"
-				},
-				{
-					"name": "filter1"
-				},
-				{
-					"name": "window1"
-				},
-				{
-					"name": "filter2"
 				}
 			],
 			"scriptLines": [
@@ -70,13 +61,7 @@
 				"derive2 derive(AnioFuente = toShort(AnioFuente),",
 				"          CapacidadEfectiva = iif(!isNull(CapacidadStr) && toDouble(CapacidadStr) > 0 && toDouble(CapacidadStr) <= 200, toInteger(round(toDouble(CapacidadStr))), toInteger(null())),",
 				"          VigenciaHasta = coalesce(VigenciaHasta, toDate('9999-12-31','yyyy-MM-dd'))) ~> derive3",
-				"derive3 filter(!isNull(AnioFuente) && !isNull(VehiculoId) && length(VehiculoId) <= 20 && !isNull(Placa) && length(Placa) <= 20 && !isNull(TipoVehiculo) && length(TipoVehiculo) <= 30 && !isNull(CapacidadEfectiva) && !isNull(VigenciaDesde) && !isNull(VigenciaHasta) && !isNull(Estado) && length(Estado) <= 20 && VigenciaHasta >= VigenciaDesde) ~> filter1",
-				"filter1 window(over(AnioFuente,",
-				"          VehiculoId),",
-				"     desc(VigenciaDesde, true),",
-				"     rn = rowNumber()) ~> window1",
-				"window1 filter(rn == 1) ~> filter2",
-				"filter2 sink(allowSchemaDrift: true,",
+				"derive3 sink(allowSchemaDrift: true,",
 				"     validateSchema: false,",
 				"     input(",
 				"          AnioFuente as integer,",
